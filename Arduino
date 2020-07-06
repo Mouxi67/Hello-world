@@ -1,0 +1,75 @@
+#define output_voltage_sense A2
+#define input_voltage_sense A0
+#define boost_pin 5
+#define buck_pin 6
+
+int raw_vin=0, raw_vout=0;
+float set_voltage = 5.0;
+float Vout;
+float Vin;
+int duty_cycle;
+String mode="";
+bool startup = true;
+
+
+void setup() {
+  // put your setup code here, to run once:
+  Serial.begin(115200);
+
+  //adjusting the frequency of Timer 0 which controls pin 5 and 6
+  TCCR0B = TCCR0B & 0b11111000 | 0x01;
+
+//turning on switch 2
+  analogWrite(buck_pin,255);
+  analogWrite(boost_pin,0);
+}
+
+void loop() {
+ 
+  while(true){
+  // reading the input and output voltages, 
+  //taking a sample of ten to increase accuracy
+    for(int i=0;i<10;i++){
+      raw_vin += analogRead(input_voltage_sense);
+      raw_vout += analogRead(output_voltage_sense);
+    }
+  //getting averages
+    raw_vin = raw_vin/10;
+    raw_vout = raw_vout/10;
+
+  //converting analogue reading into actual voltage values
+    Vin  = float(raw_vin)*0.044;
+    Vout = float(raw_vout)*0.044;
+    
+  //No need to step up or down in this region
+    if(4.5<Vin<5.5){
+      break;
+    }
+    else{
+      adjust(Vin,Vout);
+      break;
+    }
+  }
+  delay(600); 
+  
+}
+
+void adjust(float Vin, float Vout){
+  // the plus one is to cater for voltage drop accros components
+  if(Vin>set_voltage){
+    mode="";
+    mode="Buck mode";
+    duty_cycle = (set_voltage/Vin)*255;
+    analogWrite(boost_pin,0);
+    analogWrite(buck_pin,duty_cycle);
+    Serial.print("Converter MODE : ");Serial.println(mode);
+  }
+  else if(Vin<set_voltage){
+    mode="";
+    mode="Boost mode";
+    duty_cycle = (1-(Vin/set_voltage))*255;
+    analogWrite(buck_pin,255);
+    analogWrite(boost_pin,duty_cycle); 
+    Serial.print("Converter MODE : ");Serial.println(mode);
+  }
+}
